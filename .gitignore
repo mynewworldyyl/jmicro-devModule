@@ -1,0 +1,5 @@
+# Ignore build output and dependencies
+/dist/
+/build_src/
+/font/
+/node_modules/

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>蓝牙游戏柄模拟器</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #15171c; color: #e8eaed; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; touch-action: none; }
+
+    /* 竖屏提示（不再强制，仅保留样式备用，默认隐藏） */
+    #rotate-tip { display: none; }
+
+    /* 设备选择 */
+    #device-panel { position: fixed; inset: 0; display: flex; flex-direction: column; padding: 18px; }
+    #device-panel h2 { font-size: 18px; margin-bottom: 12px; font-weight: 600; }
+    #device-panel .hint { font-size: 12px; color: #9aa0a6; margin-bottom: 10px; }
+    #device-list { flex: 1; overflow-y: auto; }
+    .dev-item { background: #23262d; border: 1px solid #2f333b; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .dev-item .name { font-size: 15px; }
+    .dev-item .meta { font-size: 11px; color: #9aa0a6; margin-top: 3px; }
+    .dev-item button { background: #3b82f6; color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; }
+    .dev-item button:disabled { background: #4b5563; }
+    #refresh-btn { background: #3b82f6; color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 14px; margin-top: 6px; }
+
+    /* 手柄主屏 */
+    #pad-screen { position: fixed; inset: 0; display: none; flex-direction: row; align-items: center; justify-content: space-between; padding: 0 24px; gap: 12px; }
+    #pad-screen.on { display: flex; }
+
+    .stick-zone { position: relative; width: 36vmin; max-width: 260px; height: 36vmin; max-height: 260px; flex: 0 0 auto; }
+    .stick-base { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 50% 40%, #2a2e36, #1c1f25); border: 2px solid #353a44; box-shadow: inset 0 4px 18px rgba(0,0,0,.6); }
+    .stick-knob { position: absolute; width: 42%; height: 42%; border-radius: 50%; left: 29%; top: 29%; background: radial-gradient(circle at 50% 35%, #5b6470, #2b2f37); border: 1px solid #444b56; box-shadow: 0 4px 10px rgba(0,0,0,.5); transition: transform .03s linear; }
+
+    .side { display: flex; flex-direction: column; align-items: center; gap: 14px; flex: 0 0 auto; }
+    .row { display: flex; align-items: center; gap: 18px; }
+
+    /* 方向键 D-Pad */
+    .dpad { position: relative; width: 30vmin; max-width: 150px; height: 30vmin; max-height: 150px; }
+    .dpad .btn { position: absolute; background: #2a2e36; border: 1px solid #3a3f49; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 4vmin; color: #cfd3d9; }
+    .dpad .btn:active, .dpad .btn.active { background: #3b82f6; color: #fff; }
+    .dpad .up { top: 0; left: 50%; transform: translateX(-50%); width: 33%; height: 35%; }
+    .dpad .down { bottom: 0; left: 50%; transform: translateX(-50%); width: 33%; height: 35%; }
+    .dpad .left { left: 0; top: 50%; transform: translateY(-50%); width: 35%; height: 33%; }
+    .dpad .right { right: 0; top: 50%; transform: translateY(-50%); width: 35%; height: 33%; }
+    .dpad .mid { left: 50%; top: 50%; transform: translate(-50%,-50%); width: 33%; height: 33%; background: #23262d; border-radius: 6px; }
+
+    /* 动作按钮 ABCD */
+    .ab-grid { position: relative; width: 38vmin; max-width: 190px; height: 38vmin; max-height: 190px; }
+    .abtn { position: absolute; width: 33%; height: 33%; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #c0392b, #7d2419); border: 2px solid #e05b4c; color: #fff; font-size: 5vmin; font-weight: 600; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,.5); }
+    .abtn:active, .abtn.active { filter: brightness(1.4); transform: scale(.94); }
+    .ab-grid .a { right: 7%; top: 34%; }
+    .ab-grid .b { right: 34%; top: 7%; background: radial-gradient(circle at 50% 35%, #27ae60, #176b3a); border-color:#46c97e; }
+    .ab-grid .x { right: 34%; bottom: 7%; background: radial-gradient(circle at 50% 35%, #2980b9, #1a5276); border-color:#4aa3df; }
+    .ab-grid .y { left: 7%; top: 34%; background: radial-gradient(circle at 50% 35%, #8e44ad, #5b2c6f); border-color:#b06fd1; }
+
+    /* 顶部肩键 / 扳机 */
+    .shoulders { display: flex; gap: 10px; }
+    .sh-btn { width: 18vmin; max-width: 84px; height: 8vmin; max-height: 40px; border-radius: 10px; background: #2a2e36; border: 1px solid #3a3f49; color: #cfd3d9; font-size: 3vmin; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+    .sh-btn:active, .sh-btn.active { background: #3b82f6; color: #fff; }
+
+    /* 中部 start/select */
+    .center-col { display: flex; flex-direction: column; align-items: center; gap: 16px; flex: 0 0 auto; }
+    .mini-btn { width: 12vmin; max-width: 56px; height: 6vmin; max-height: 28px; border-radius: 14px; background: #2a2e36; border: 1px solid #3a3f49; color: #cfd3d9; font-size: 2.3vmin; display: flex; align-items: center; justify-content: center; }
+    .mini-btn:active, .mini-btn.active { background: #3b82f6; color: #fff; }
+
+    /* 竖屏：改为纵向堆叠并允许滚动，控件等比缩小 */
+    @media (orientation: portrait) {
+      #pad-screen { flex-direction: column; align-items: center; justify-content: flex-start; padding: 56px 8px 8px; overflow-y: auto; gap: 18px; }
+      .side { flex-direction: row; gap: 18px; }
+      .stick-zone { width: 28vmin; height: 28vmin; }
+      .ab-grid { width: 34vmin; height: 34vmin; }
+      .dpad { width: 28vmin; height: 28vmin; }
+      .center-col { flex-direction: row; }
+    }
+
+    #status-bar { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); font-size: 12px; padding: 4px 12px; border-radius: 12px; background: rgba(0,0,0,.5); z-index: 50; }
+    #status-bar.ok { color: #4ade80; }
+    #status-bar.err { color: #f87171; }
+    #log { position: fixed; bottom: 6px; left: 8px; right: 8px; font-size: 10px; color: #6b7280; height: 16px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; z-index: 50; }
+  </style>
+</head>
+<body>
+  <div id="rotate-tip">
+    <div class="icon">📱</div>
+    <p>请横屏使用游戏柄</p>
+  </div>
+
+  <div id="device-panel">
+    <h2>选择设备</h2>
+    <div class="hint" id="acc-hint">正在获取账号信息...</div>
+    <div id="device-list"></div>
+    <button id="refresh-btn">刷新设备列表</button>
+  </div>
+
+  <div id="status-bar">未连接</div>
+
+  <div id="pad-screen">
+    <!-- 左肩键 L1 / L2 -->
+    <div class="shoulders" style="position:absolute;top:10px;left:8px;">
+      <div class="sh-btn" data-act="lb">L1</div>
+      <div class="sh-btn" data-act="lt">L2</div>
+    </div>
+    <!-- 右肩键 R1 / R2 -->
+    <div class="shoulders" style="position:absolute;top:10px;right:8px;">
+      <div class="sh-btn" data-act="rb">R1</div>
+      <div class="sh-btn" data-act="rt">R2</div>
+    </div>
+
+    <!-- 左侧：摇杆 + 方向键 -->
+    <div class="side" style="margin-top:30px;">
+      <div class="stick-zone" id="stick-left">
+        <div class="stick-base"></div>
+        <div class="stick-knob"></div>
+      </div>
+      <div class="dpad">
+        <div class="btn up" data-hat="up">▲</div>
+        <div class="btn down" data-hat="down">▼</div>
+        <div class="btn left" data-hat="left">◀</div>
+        <div class="btn right" data-hat="right">▶</div>
+        <div class="mid"></div>
+      </div>
+    </div>
+
+    <!-- 中部 -->
+    <div class="center-col">
+      <div class="mini-btn" data-act="select">SELECT</div>
+      <div class="mini-btn" data-act="start">START</div>
+      <div class="mini-btn" data-act="home">HOME</div>
+    </div>
+
+    <!-- 右侧：动作键 + 摇杆 -->
+    <div class="side" style="margin-top:30px;">
+      <div class="ab-grid">
+        <div class="abtn a" data-btn="1">A</div>
+        <div class="abtn b" data-btn="2">B</div>
+        <div class="abtn x" data-btn="3">X</div>
+        <div class="abtn y" data-btn="4">Y</div>
+      </div>
+      <div class="stick-zone" id="stick-right">
+        <div class="stick-base"></div>
+        <div class="stick-knob"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="log">就绪</div>
+
+  <script>
+  (function () {
+    "use strict";
+    const GP_IDX = 0;
+    const MAX_AXIS = 32767;
+    const logEl = document.getElementById('log');
+    const statusEl = document.getElementById('status-bar');
+
+    function log(msg) { logEl.textContent = msg; console.log('[gamepad] ' + msg); }
+    function setStatus(txt, cls) { statusEl.textContent = txt; statusEl.className = cls || ''; }
+
+    // 安全调用 bleGamepad（web 端为异步，统一 await）
+    async function gp(fn, ...args) {
+      try {
+        if (typeof bleGamepad === 'undefined') { log('bleGamepad 不可用'); return null; }
+        const r = await bleGamepad[fn](GP_IDX, ...args);
+        return r;
+      } catch (e) {
+        log('调用 ' + fn + ' 失败: ' + e.message);
+        return null;
+      }
+    }
+
+    /* ---------- 设备选择 ---------- */
+    async function loadDevices() {
+      try {
+        const name = (jm && jm.getActName) ? jm.getActName() : '未登录';
+        document.getElementById('acc-hint').textContent = '当前账号: ' + name + ' | 在线设备列表';
+        const rst = await jm.getDeviceList();
+        const list = document.getElementById('device-list');
+        list.innerHTML = '';
+        if (!rst || rst.code !== 0 || !rst.data || !rst.data.length) {
+          list.innerHTML = '<div class="hint">无在线设备</div>';
+          log('设备列表为空');
+          return;
+        }
+        rst.data.forEach(function (d) {
+          const item = document.createElement('div');
+          item.className = 'dev-item';
+          const info = document.createElement('div');
+          info.innerHTML = '<div class="name">' + (d.name || d.deviceId) + '</div>' +
+                           '<div class="meta">ID: ' + d.deviceId + ' | 类型:' + d.type + ' | 状态:' + d.status + '</div>';
+          const btn = document.createElement('button');
+          btn.textContent = '连接';
+          btn.onclick = function () { connectDevice(d.deviceId, d.name); };
+          item.appendChild(info); item.appendChild(btn);
+          list.appendChild(item);
+        });
+      } catch (e) {
+        log('获取设备列表失败: ' + e.message);
+      }
+    }
+
+    async function connectDevice(deviceId, name) {
+      try {
+        jm.setDev(deviceId);
+        setStatus('正在创建游戏柄...', '');
+        const r = await gp('create', 'JMicro Gamepad', 'JMicro', 100, { btn: 16, hat: 1, ctype: (bleGamepad.CTYPE_XBOX||0), ax: 0x3F, sim: 0x1F, sp: 0x0B });
+        if (!r || r.code !== 0) { setStatus('创建失败', 'err'); log('create code=' + (r&&r.code)); return; }
+        document.getElementById('device-panel').style.display = 'none';
+        document.getElementById('pad-screen').classList.add('on');
+        setStatus('游戏柄已就绪 (未连接手机)', 'ok');
+        log('已连接设备 ' + name + '，游戏柄实例创建成功');
+        pollConnection();
+      } catch (e) {
+        setStatus('连接异常', 'err');
+        log('connectDevice 异常: ' + e.message);
+      }
+    }
+
+    async function pollConnection() {
+      setInterval(async function () {
+        const c = await gp('isConnected');
+        if (c === true) setStatus('已连接到手机 ✓', 'ok');
+        else if (c === false) setStatus('等待手机连接...', '');
+      }, 1500);
+    }
+
+    document.getElementById('refresh-btn').onclick = loadDevices;
+    if (typeof jm !== 'undefined') loadDevices();
+    else { document.getElementById('acc-hint').textContent = 'jm 通信模块未加载'; }
+
+    /* ---------- 虚拟摇杆 ---------- */
+    function bindStick(zoneId, setFn) {
+      const zone = document.getElementById(zoneId);
+      const knob = zone.querySelector('.stick-knob');
+      let active = false, cx = 0, cy = 0, R = 0;
+
+      function update(touch) {
+        let dx = touch.clientX - cx;
+        let dy = touch.clientY - cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist > R) { dx = dx / dist * R; dy = dy / dist * R; }
+        knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+        const nx = Math.round(dx / R * MAX_AXIS);
+        const ny = Math.round(dy / R * MAX_AXIS);
+        setFn(nx, ny);
+      }
+      function start(e) {
+        const rect = zone.getBoundingClientRect();
+        cx = rect.left + rect.width / 2; cy = rect.top + rect.height / 2; R = rect.width / 2;
+        active = true; zone.setPointerCapture(e.pointerId);
+        update(e); e.preventDefault();
+      }
+      function move(e) { if (active) { update(e); e.preventDefault(); } }
+      function end() { if (!active) return; active = false; knob.style.transform = 'translate(0,0)'; setFn(0, 0); }
+
+      zone.addEventListener('pointerdown', start);
+      zone.addEventListener('pointermove', move);
+      zone.addEventListener('pointerup', end);
+      zone.addEventListener('pointercancel', end);
+    }
+
+    // 左摇杆：x=水平 y=垂直
+    bindStick('stick-left', function (x, y) { gp('setLeftThumb', x, -y); });
+    // 右摇杆：z=水平 rZ=垂直
+    bindStick('stick-right', function (x, y) { gp('setRightThumb', x, -y); });
+
+    /* ---------- 动作按钮 A/B/X/Y -> BUTTON_1..4 ---------- */
+    document.querySelectorAll('.abtn').forEach(function (el) {
+      const b = parseInt(el.dataset.btn, 10);
+      const down = function (e) { e.preventDefault(); el.classList.add('active'); gp('press', b); };
+      const up = function (e) { e.preventDefault(); el.classList.remove('active'); gp('release', b); };
+      el.addEventListener('pointerdown', down);
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+      el.addEventListener('pointerleave', up);
+    });
+
+    /* ---------- 方向键 -> Hat1 ---------- */
+    const HAT = {
+      up: (bleGamepad.HAT_UP !== undefined ? bleGamepad.HAT_UP : 0),
+      down: (bleGamepad.HAT_DOWN !== undefined ? bleGamepad.HAT_DOWN : 4),
+      left: (bleGamepad.HAT_LEFT !== undefined ? bleGamepad.HAT_LEFT : 6),
+      right: (bleGamepad.HAT_RIGHT !== undefined ? bleGamepad.HAT_RIGHT : 2)
+    };
+    const HAT_NULL = (bleGamepad.HAT_NULL !== undefined ? bleGamepad.HAT_NULL : -1);
+    document.querySelectorAll('.dpad .btn').forEach(function (el) {
+      const dir = el.dataset.hat;
+      const down = function (e) { e.preventDefault(); el.classList.add('active'); gp('setHat1', HAT[dir]); };
+      const up = function (e) { e.preventDefault(); el.classList.remove('active'); gp('setHat1', HAT_NULL); };
+      el.addEventListener('pointerdown', down);
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+      el.addEventListener('pointerleave', up);
+    });
+
+    /* ---------- 肩键 L1/R1 -> BUTTON_5/6, 扳机 L2/R2 -> BUTTON_7/8 ---------- */
+    const SH = { lb: 5, rb: 6, lt: 7, rt: 8 };
+    document.querySelectorAll('.sh-btn').forEach(function (el) {
+      const b = SH[el.dataset.act];
+      const down = function (e) { e.preventDefault(); el.classList.add('active'); gp('press', b); };
+      const up = function (e) { e.preventDefault(); el.classList.remove('active'); gp('release', b); };
+      el.addEventListener('pointerdown', down);
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+      el.addEventListener('pointerleave', up);
+    });
+
+    /* ---------- Start / Select / Home ---------- */
+    const SP = {
+      start: (bleGamepad.SPECIAL_START !== undefined ? bleGamepad.SPECIAL_START : 0),
+      select: (bleGamepad.SPECIAL_SELECT !== undefined ? bleGamepad.SPECIAL_SELECT : 1),
+      home: (bleGamepad.SPECIAL_HOME !== undefined ? bleGamepad.SPECIAL_HOME : 3)
+    };
+    document.querySelectorAll('.mini-btn').forEach(function (el) {
+      const sb = SP[el.dataset.act];
+      const down = function (e) { e.preventDefault(); el.classList.add('active'); gp('pressSpecialButton', sb); };
+      const up = function (e) { e.preventDefault(); el.classList.remove('active'); gp('releaseSpecialButton', sb); };
+      el.addEventListener('pointerdown', down);
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+      el.addEventListener('pointerleave', up);
+    });
+
+    log('页面初始化完成');
+  })();
+  </script>
+</body>
+</html>

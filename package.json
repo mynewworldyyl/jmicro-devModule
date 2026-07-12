@@ -1,0 +1,28 @@
+{
+  "name": "jmicro-srvitem",
+  "version": "1.0.0",
+  "description": "JMicro service item bundle",
+  "main": "dist/index.js",
+  "scripts": {
+    "clean": "node cleanbuild.js",
+    "clean:buildsrc": "node -e \"const fs=require('fs');const p=require('path').join(__dirname,'build_src');if(fs.existsSync(p)){fs.rmSync(p,{recursive:true,force:true});console.log('cleaned build_src')}\"",
+    "prebuild": "node prebuild.js",
+    "build": "npm run prebuild && webpack --mode production",
+    "build:dev": "npm run prebuild && webpack --mode development",
+    "watch": "npm run prebuild && webpack --watch"
+  },
+  "keywords": [
+    "jmicro",
+    "iot"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/core": "^7.23.0",
+    "@babel/preset-env": "^7.23.0",
+    "babel-loader": "^9.1.0",
+    "terser-webpack-plugin": "^5.5.0",
+    "webpack": "^5.88.0",
+    "webpack-cli": "^5.1.0"
+  }
+}
