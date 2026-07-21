@@ -78,7 +78,7 @@ function processAsyncMethods(content) {
         const bodyEnd = p;
 
         const methodBody = result.slice(bodyStart + 1, bodyEnd - 1);
-        let newBody = methodBody.replace(/(var\s+\w+\s*=\s*)jm\.s\(/g, '$1await jm.s(');
+        let newBody = methodBody.replace(/((?:let|var|const)\s+\w+\s*=\s*)jm\.s\(/g, '$1await jm.s(');
         if (newBody === methodBody) {
             newBody = methodBody.replace(/(return\s*)jm\.s\(/g, '$1await jm.s(');
         }

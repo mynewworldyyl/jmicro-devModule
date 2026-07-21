@@ -117,11 +117,14 @@ var swt = {
      * // 查询普通继电器状态
      * let result = swt.status(1, 5);
      * if (result.code === 0) {
-     *     console.log("当前状态: " + (result.status ? "打开" : "关闭"));
+     *     console.log("当前状态: " + (result.v==1 ? "打开" : "关闭"));
      * }
      * 
      * // 查询磁保持继电器状态
-     * let relayStatus = swt.status(2, 4, 5);
+     * let relayStatus = swt.status(2, 5, 12);
+     * if (relayStatus.code === 0) {
+     *     console.log("当前状态: " + (relayStatus.v==1 ? "打开" : "关闭"));
+     * }
      */
     status: function (type, pin, p1, targetDevId, sync) {
         return jm.s({ "_fn": swtId, "op": 0, "p": pin, "ty": type, "p1": p1, "_d": targetDevId, "_s": sync });
@@ -159,7 +162,7 @@ var swt = {
      * swt.turnOn(3, 12);
      */
     turnOn: function (type, pin, p1, targetDevId, sync) {
-        return jm.s({ "_fn": swtId, "op": 2, "p": pin, "ty": type, "p1": p1, "_d": targetDevId, "_s": sync });
+        return jm.s({ "_fn": swtId, "op": 1, "p": pin, "ty": type, "p1": p1, "_d": targetDevId, "_s": sync });
     },
 
     /**
@@ -191,7 +194,7 @@ var swt = {
      * swt.turnOff(2, 4, 5);
      */
     turnOff: function (type, pin, p1, targetDevId, sync) {
-        return jm.s({ "_fn": swtId, "op": 1, "p": pin, "ty": type, "p1": p1, "_d": targetDevId, "_s": sync });
+        return jm.s({ "_fn": swtId, "op": 2, "p": pin, "ty": type, "p1": p1, "_d": targetDevId, "_s": sync });
     },
 
     /**
@@ -221,29 +224,7 @@ var swt = {
         console.log("toggle Begin");
         return jm.s({ "_fn": swtId, "op": 3, "p": pin, "ty": type, "p1": p1, "_d": targetDevId, "_s": sync });
     },
-    
-    /**
-     * 对开和关的操作进行取反
-     * 
-     * 该方法用于交换"打开"和"关闭"操作的逻辑。
-     * 例如，如果当前模式是"高电平开"，调用后变为"低电平开"。
-     * 此操作仅改变内部逻辑，不实际控制GPIO。
-     * 
-     * @param {number} type - 开关设备的类型，取值为 1（普通继电器）、2（磁保持继电器）或 3（MOS管开关）。
-     * @param {number} pin - Gpio 编号。对于磁保持继电器（type == 2），此为置位引脚。
-     * @param {number} [p1] - 仅在 type == 2（磁保持继电器）时有效，表示复位引脚编号。
-     * @param {number} [targetDevId] - 目标设备ID，为空时操作当前设备
-     * @param {boolean} [sync] - 是否同步请求，true表示同步等待结果，false表示异步执行，默认为false
-     * @returns {SwitchResult} 返回操作结果对象，code为0表示成功
-     * 
-     * @example
-     * // 取反普通继电器的操作逻辑
-     * swt.toggleModel(1, 5);
-     */
-    toggleModel: function (type, pin, p1, targetDevId, sync) {
-        return jm.s({ "_fn": swtId, "op": 4, "p": pin, "ty": type, "p1": p1, "_d": targetDevId, "_s": sync });
-    },
-    
+     
     /**
      * 修正开关的状态，当前是开状态则变为关，当关为关状态则变为开，不会真正操作灯的状态
      * 

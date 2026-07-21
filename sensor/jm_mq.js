@@ -96,6 +96,8 @@ var mq = {
      * if (mq.isExistMq(2)) {
      *   console.log("MQ-2传感器已连接");
      * }
+     * 
+     * @async 
      */
     isExistMq: function (mqType) {
         let rst = jm.s({ "_fn": mqid, ty: mtype, op: 2, mqType: mqType });
@@ -129,6 +131,8 @@ var mq = {
      *   enable: true,
      *   gasType: 0       // 燃气
      * });
+     * 
+     * @async
      */
     createMq: function (mqType, pin, ratioCleanAir, a, b, rl, options) {
         let params = { 
@@ -166,6 +170,8 @@ var mq = {
      * 
      * @example
      * mq.stopMq(2); // 停止MQ-2传感器
+     * 
+     * @async 
      */
     stopMq: function (mqType) {
         let rst = jm.s({ "_fn": mqid, ty: mtype, op: 4, mqType: mqType });
@@ -183,6 +189,8 @@ var mq = {
      * 
      * @example
      * mq.chloop(false); // 禁用底层监控
+     * 
+     * @async 
      */
     chloop: function (enable) {
         let rst = jm.s({ "_fn": mqid, ty: mtype, op: 5, v: enable });
@@ -211,23 +219,18 @@ var mq = {
      *   enable: true,
      *   gasType: 0       // 燃气
      * });
+     * 
+     * @async
      */
     setAlertConfig: function (mqType, config) {
-        let params = { 
-            "_fn": mqid, 
-            ty: mtype, 
-            op: 6, 
-            mqType: mqType 
-        };
-        
-        if (config) {
-            if (config.warning) params.n = config.warning;
-            if (config.danger) params.w = config.danger;
-            if (config.enable) params.e = config.enable;
-            if (config.gasType) params.t = config.gasType;
-        }
-        
-        let rst = jm.s(params);
+       if(!config) config = {}
+        if(!config.mqType) config["mqType"] = mqType
+
+        config["_fn"] = mqid
+        config["ty"] = mtype
+        config["op"] = 6
+
+        let rst = jm.s(config);
         return rst ? rst.code : null;
     },
 
@@ -268,6 +271,8 @@ var mq = {
      * 
      * @example
      * mq.setOledEnable(true); // 启用OLED显示
+     * 
+     * @async
      */
     setOledEnable: function (enable) {
         let rst = jm.s({ "_fn": mqid, ty: mtype, op: 8, e: enable });
