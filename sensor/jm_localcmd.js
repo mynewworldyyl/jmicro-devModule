@@ -22,6 +22,11 @@
  *   6: cmdId 已被占用
  *   7: 没有可用的 cmdId
  *   8: 未知操作码
+ *   9: 缺少阈值参数
+ *   10: 阈值超出范围(0~9999)
+ *   11: multinet 未初始化
+ *   12: 设置阈值失败
+ * - msg (string): 错误描述
  * - data (Array): 查询类操作返回的命令列表，每条包含 id 和 text
  * - count (number): 命令总数
  * - cmdId (number): 注册成功时返回的命令 ID
@@ -31,7 +36,7 @@
  * @var localCmd
  * @category speech
  * @keywords 语音命令,本地命令,ASR,语音识别,命令管理
- * @capabilities list,add
+ * @capabilities list,add,setThreshold
  * @depends 无
  */
 
@@ -153,6 +158,26 @@ var localCmd = {
             count: successCount,
             msg: successCount > 0 ? "ok" : "no available cmdId"
         };
+    },
+
+    /**
+     * 设置命令识别阈值。
+     * 阈值用于过滤低置信度的误识别结果，值越高误报越少但可能漏检。
+     * 例如：阈值0.6表示只有识别概率>=0.6的命令才会被接受。
+     *
+     * @param {number} threshold - 识别阈值，范围 0.0~1.0。例如：0.6 表示60%置信度。
+     * @returns {object} 返回操作结果对象：
+     *                   - code: 0 成功，9 缺少参数，10 超出范围，11 未初始化，12 设置失败。
+     *                   - threshold: 设置的阈值
+     *
+     * @example
+     * let rst = localCmd.setThreshold(0.6);
+     * if (rst.code === 0) {
+     *     console.log("阈值设置成功:", rst.threshold);
+     * }
+     */
+    setThreshold: function (threshold) {
+        return jm.s({ '_fn': localCmdDefId, 'ty': localCmdType, 'op': 4, 't': Math.round(threshold * 10000) });
     }
 };
 
