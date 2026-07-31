@@ -21,16 +21,27 @@ var event = {
      * 
      * @param {number} type - 事件类型。
      * @param {Object} evt - 事件对象，一般有subType, data, ec这些字段，也可以全没有，视具体事件类型而定。
+     * @param {number} [targetDevId] - 目标设备ID，为空时操作当前设备
+     * @param {boolean} [sync] - 是否同步请求，true表示同步等待结果，false表示异步执行不等待结果，默认为false
      * @returns {Object} - 返回底层方法 `jm.e` 的执行结果。
      * 
      * @example
-     * event.post(event.JM_TASK_APP_KEY, { subType: 1, data: 2 });
+     * event.post(event.JM_TASK_APP_KEY, { subType: 1, data: 2 },"dev001", false);
      */
-    post: function(type, evt) {
+    post: function(type, evt, targetDevId, sync) {
         // 如果事件对象没有 subType，则设置为默认值 0
         if (!evt.subType) {
-            evt.subType = 0;
+            evt["subType"] = 0;
         }
+
+        if(targetDevId) {
+            evt["_d"] = targetDevId;
+        }
+
+        if(sync) {
+            evt["_s"] = sync;
+        }
+
         // 调用底层方法分发事件
         return jm.e(3, type, evt);
     },
