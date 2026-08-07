@@ -262,7 +262,7 @@ var bleMouse = {
      *     console.log("左键已按下");
      * }
      * 
-     *  @
+     * @async
      *   
      */
     isPressed: function (idx, b) {

@@ -46,6 +46,7 @@ import ah20 from "./sensor/jm_aht20.js"
 import neo from "./sensor/jm_neopixel.js"
 import sensor from "./sensor/jm_sensor.js"
 import mq from "./sensor/jm_mq.js"
+import mqttProxy from "./sensor/jm_mqtt_proxy.js"
 import bl0937 from "./sensor/jm_bl0937.js"
 import battery from "./sensor/jm_battery.js"
 
@@ -95,7 +96,8 @@ const jmModule = {
     battery,
     bleMouse,
     bleKeyboard,
-    bleGamepad
+    bleGamepad,
+    mqttProxy
 }
 
 Object.assign(jm, jmModule);

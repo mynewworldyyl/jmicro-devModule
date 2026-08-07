@@ -138,6 +138,7 @@ var event = {
     JM_TASK_APP_FINISH_LOAD_CMD: 38,      // 完成从服务器加载语音命令事件
     JM_TASK_APP_CTRL_EVENT: 39,           // 应用控制事件
     JM_TASK_APP_ON_MSG: 40,               // 应用控制事件
+    JM_TASK_APP_MQTT_MSG: 52,             //MQTT订阅消息
 
     // 事件标志，
     JM_APP_EVENT_SUC: 0,                  // 成功事件（具体由事件实现者定义）
