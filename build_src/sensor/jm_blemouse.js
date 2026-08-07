@@ -262,15 +262,15 @@ var bleMouse = {
      *     console.log("左键已按下");
      * }
      * 
-     *  @
+     * @async
      *   
      */
-    isPressed: function (idx, b) {
+    isPressed: async function (idx, b) {
         var args = { '_fn': bleMouseDefId, 'ty': bleType, 'op': 7, 'idx': idx };
         if (b) {
             args['b'] = b;
         }
-        var rst = jm.s(args);
+        var rst = await jm.s(args);
         return rst && rst.code === 0 ? rst.v : false;
     },
 

@@ -114,6 +114,8 @@ var gpio = {
      * @function pinMode
      * @param {number} pin - 需要设置的引脚号（GPIO编号）
      * @param {number} mode - 引脚模式（使用预定义常量）
+     * @param {number} [targetDevId] - 目标设备ID，为空时操作当前设备
+     * @param {boolean} [sync] - 是否同步请求，true表示同步等待结果，false表示异步执行，默认为false
      * @returns {GPIOResult} 返回操作结果对象，code为0表示成功
      * 
      * @example
@@ -123,8 +125,8 @@ var gpio = {
      * // 设置引脚 2 为上拉输入模式
      * gpio.pinMode(2, gpio.INPUT_PULLUP);
      */
-    pinMode: function (pin, mode) {
-        return jm.s({ "_fn": gd, op: 7, gpioNo: pin, m: mode });
+    pinMode: function (pin, mode, targetDevId, sync) {
+        return jm.s({ "_fn": gd, op: 7, gpioNo: pin, m: mode , "_d": targetDevId, "_s": sync });
     },
 
     /**
@@ -138,6 +140,8 @@ var gpio = {
      * @returns {number} 返回引脚的数字值：
      *   - 0: 低电平（LOW）
      *   - 1: 高电平（HIGH）
+     * @param {number} [targetDevId] - 目标设备ID，为空时操作当前设备
+     * @param {boolean} [sync] - 是否同步请求，true表示同步等待结果，false表示异步执行，默认为false
      * @throws {Object} 如果读取失败，抛出错误对象（code非0）
      * 
      * @example
@@ -161,8 +165,8 @@ var gpio = {
      *     console.log("读取失败: " + e.msg);
      * }
      */
-    readDigit: function (pin) {
-        return jm.s({ "_fn": gd, op: 0, gpioNo: pin });
+    readDigit: function (pin, targetDevId, sync) {
+        return jm.s({ "_fn": gd, op: 0, gpioNo: pin, "_d": targetDevId, "_s": sync  });
     },
 
     /**
@@ -176,6 +180,9 @@ var gpio = {
      * @param {number} val - 需要写入的值：
      *   - gpio.HIGH (1): 输出高电平
      *   - gpio.LOW (0): 输出低电平
+     * 
+     * @param {number} [targetDevId] - 目标设备ID，为空时操作当前设备
+     * @param {boolean} [sync] - 是否同步请求，true表示同步等待结果，false表示异步执行，默认为false
      * @returns {GPIOResult} 返回操作结果对象，code为0表示成功
      * 
      * @example
@@ -185,8 +192,8 @@ var gpio = {
      * // 向引脚 5 写入低电平
      * gpio.writeDigit(5, gpio.LOW);
      */
-    writeDigit: function (pin, val) {
-        return jm.s({ "_fn": gd, op: 13, gpioNo: pin, v: val });
+    writeDigit: function (pin, val, targetDevId, sync) {
+        return jm.s({ "_fn": gd, op: 13, gpioNo: pin, v: val, "_d": targetDevId, "_s": sync  });
     },
 
     /**
@@ -198,6 +205,8 @@ var gpio = {
     * 
      * @function reverse
      * @param {number} pin - 需要反转状态的引脚号（GPIO编号）
+     * @param {number} [targetDevId] - 目标设备ID，为空时操作当前设备
+     * @param {boolean} [sync] - 是否同步请求，true表示同步等待结果，false表示异步执行，默认为false
      * @returns {GPIOResult} 返回操作结果对象，code为0表示成功
      * 
      * @example
@@ -209,8 +218,8 @@ var gpio = {
      *     gpio.reverse(13);
      * }, 500);
      */
-    reverse: function (pin) {
-        return jm.s({ "_fn": gd, op: 3, gpioNo: pin });
+    reverse: function (pin, targetDevId, sync) {
+        return jm.s({ "_fn": gd, op: 3, gpioNo: pin, "_d": targetDevId, "_s": sync  });
     },
 
     /**
@@ -221,7 +230,8 @@ var gpio = {
      * 
      * @function boardLedFlash
      * @returns {GPIOResult} 返回操作结果对象，code为0表示成功
-     * 
+     * @param {number} [targetDevId] - 目标设备ID，为空时操作当前设备
+     * @param {boolean} [sync] - 是否同步请求，true表示同步等待结果，false表示异步执行，默认为false
      * @example
      * // 使板载 LED 闪烁
      * gpio.boardLedFlash();
@@ -231,8 +241,8 @@ var gpio = {
      *     gpio.boardLedFlash();
      * }
      */
-    boardLedFlash: function () {
-        return jm.s({ "_fn": gd, op: 4 });
+    boardLedFlash: function ( targetDevId, sync) {
+        return jm.s({ "_fn": gd, op: 4, "_d": targetDevId, "_s": sync  });
     },
 
     /**
@@ -243,14 +253,16 @@ var gpio = {
      *
      * @function writeHight
      * @param {number} pin - 需要写入的引脚号（GPIO编号）
+     * @param {number} [targetDevId] - 目标设备ID，为空时操作当前设备
+     * @param {boolean} [sync] - 是否同步请求，true表示同步等待结果，false表示异步执行，默认为false
      * @returns {GPIOResult} 返回操作结果对象，code为0表示成功
      * 
      * @example
      * // 向引脚 5 写入高电平
      * gpio.writeHight(5);
      */
-    writeHight: function (pin) {
-        return jm.s({ "_fn": gd, op: 1, gpioNo: pin });
+    writeHight: function (pin, targetDevId, sync) {
+        return jm.s({ "_fn": gd, op: 1, gpioNo: pin, "_d": targetDevId, "_s": sync  });
     },
 
     /**
@@ -261,14 +273,16 @@ var gpio = {
      *
      * @function writeLow
      * @param {number} pin - 需要写入的引脚号（GPIO编号）
+    * @param {number} [targetDevId] - 目标设备ID，为空时操作当前设备
+     * @param {boolean} [sync] - 是否同步请求，true表示同步等待结果，false表示异步执行，默认为false
      * @returns {GPIOResult} 返回操作结果对象，code为0表示成功
      * 
      * @example
      * // 向引脚 6 写入低电平
      * gpio.writeLow(6);
      */
-    writeLow: function (pin) {
-        return jm.s({ "_fn": gd, op: 2, gpioNo: pin });
+    writeLow: function (pin, targetDevId, sync) {
+        return jm.s({ "_fn": gd, op: 2, gpioNo: pin, "_d": targetDevId, "_s": sync  });
     }
 };
 
