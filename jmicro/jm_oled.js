@@ -1,558 +1,540 @@
 /**
  * OLED 显示屏控制模块
- * 提供 OLED 初始化、清屏、显示字符、字符串、数字、图形、滚动等功能，
- * 支持十进制、十六进制、二进制数字显示。
- * 使用时方法名称前一定要带上 oled. 前缀
+ * 该模块提供 OLED 显示屏的初始化、清屏、显示字符串/字符、填充屏幕、画图形、滚动等功能。
+ * 底层通过 defId=101 注册的控制命令实现，与 jm_stm32_oled_ctrl.c 对应。
  *
- * @module OLED显示屏控制接口
+ * 使用时方法名称前一定要带上 oled.前缀
+ *
+ * OLED API 返回值说明：
+ *
+ * 大多数方法返回的对象结构如下：
+ * @typedef {Object} OLEDDisplayResult
+ * @property {number} code - 状态码，0 表示成功，非 0 表示错误
+ *   - 0: 操作成功
+ *   - 1: 无效的操作码
+ *   - 2: 缺少参数
+ * @property {number} [status] - 操作状态（部分方法返回）
+ * @property {string} [msg] - 错误消息（仅在 code != 0 时返回）
+ *
+ * @module OLED显示屏控制模块
  * @var oled
- * @category display
- * @keywords OLED,显示屏,SSD1306,I2C,字符显示,数字显示,清屏,初始化,图形,滚动
- * @capabilities init,clear,showChar,showString,showNum,showSignedNum,showHexNum,showBinNum,updateScreen,toggleInvert,fill,drawPixel,gotoXY,putc,drawLine,drawRectangle,drawFilledRectangle,drawTriangle,drawFilledTriangle,drawCircle,drawFilledCircle,drawBitmap,scrollRight,scrollLeft,scrolldiagright,scrolldiagleft,stopscroll,invertDisplay,on,off
+ * @category oled
+ * @keywords OLED,SSD1306,显示屏,字符串,清屏,填充,画线,画圆,画矩形,滚动
+ * @capabilities init,showText,showChar,clear,fill,update,scrollRight,scrollLeft,scrollDiagRight,scrollDiagLeft,stopScroll,drawPixel,drawLine,drawRectangle,drawFilledRectangle,drawTriangle,drawFilledTriangle,drawCircle,drawFilledCircle,invertDisplay,toggleInvert,on,off
  * @depends 无
  */
 
-let oleddefId = 101;
+let od = 101;
 
 var oled = {
+
     /**
      * 初始化 OLED 显示屏。
-     * 配置 OLED 模块并清屏，准备好显示内容。
      *
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * 该方法初始化 SSD1306 控制器，包括 I2C 通信、显示参数配置等。
+     * 在调用其他显示方法前，必须先调用本方法。
      *
-     * @cfg {return:false,name:"初始化OLED" }
-     *
-     * @example
+     * @function init
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
+      * @cfg {return:false,name:"初始化OLED"}
+      * @example
      * // 初始化 OLED
      * oled.init();
+     *
+     * // 初始化后延时 100ms 再显示
+     * setTimeout(function() {
+     *     oled.showText("Hello", 0, 0, oled.FONT_7X10);
+     *     oled.update();
+     * }, 100);
      */
     init: function () {
-        return jm.s({ "_fn": oleddefId, op: 1 });
+        return jm.s({ "_fn": od, "op": 0 });
     },
 
     /**
-     * 清空 OLED 显示屏。
-     * 将整个屏幕内容清除为空白（全黑）。
+     * 字体常量定义。
+     * @constant {number} FONT_7X10
+     * @constant {number} FONT_11X18
+     * @constant {number} FONT_16X26
+     */
+    FONT_7X10: 0,
+    FONT_11X18: 1,
+    FONT_16X26: 2,
+
+    /**
+     * 显示字符串。
      *
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * 该方法将字符串写入 OLED 显示缓冲区，并立即刷新屏幕。
+     * 调用前请确保 OLED 已初始化。
      *
-     * @cfg {return:false,name:"清空屏幕" }
+     * @function showText
+     * @param {string} text - 需要显示的字符串内容
+     * @param {number} x - 起始 X 坐标（0 到 SSD1306_WIDTH-1）
+     * @param {number} y - 起始 Y 坐标（0 到 SSD1306_HEIGHT-1）
+     * @param {number} [font] - 字体类型，默认为 FONT_7X10
+     *   - oled.FONT_7X10: 7x10 像素字体
+     *   - oled.FONT_11X18: 11x18 像素字体
+     *   - oled.FONT_16X26: 16x26 像素字体
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
+     * @cfg {return:false,name:"显示字符串",textType:"text",font:"字体",fontOptions:"7x10字体=0,11x18字体=1,16x26字体=2",x:"坐标",y:"纵坐标"}
+     * @example
+     * // 在坐标 (0, 0) 显示字符串，使用默认字体
+     * oled.showText("Hello World", 0, 0);
+     *
+     * // 在坐标 (10, 20) 显示字符串，使用 16x26 字体
+     * oled.showText("JMicro", 10, 20, oled.FONT_16X26);
+     */
+    showText: function (text, x, y, font) {
+        return jm.s({ "_fn": od, "op": 1, "text": text, "x": x, "y": y, "font": (font !== undefined ? font : 0) });
+    },
+
+    /**
+     * 显示单个字符。
+     *
+     * 该方法将一个字符写入 OLED 显示缓冲区，并立即刷新屏幕。
+     *
+     * @function showChar
+     * @param {number} ch - 字符的 ASCII 码值
+     * @param {number} x - 起始 X 坐标（0 到 SSD1306_WIDTH-1）
+     * @param {number} y - 起始 Y 坐标（0 到 SSD1306_HEIGHT-1）
+     * @param {number} [font] - 字体类型，默认为 FONT_7X10
+     *   - oled.FONT_7X10: 7x10 像素字体
+     *   - oled.FONT_11X18: 11x18 像素字体
+     *   - oled.FONT_16X26: 16x26 像素字体
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
+     *
+     * @cfg {return:false,name:"显示字符",ch:"字符",font:"字体",fontOptions:"7x10字体=0,11x18字体=1,16x26字体=2",x:"横坐标",y:"纵坐标"}
+     * @example
+     * // 在坐标 (0, 0) 显示字符 'A'
+     * oled.showChar(65, 0, 0);
+     *
+     * // 在坐标 (20, 30) 显示字符 'Z'，使用 11x18 字体
+     * oled.showChar(90, 20, 30, oled.FONT_11X18);
+     */
+    showChar: function (ch, x, y, font) {
+        return jm.s({ "_fn": od, "op": 2, "ch": ch, "x": x, "y": y, "font": (font !== undefined ? font : 0) });
+    },
+
+    /**
+     * 清除 OLED 显示缓冲区。
+     *
+     * 该方法清除当前显示内容，屏幕将被清空（所有像素熄灭）。
+     * 清屏后需要调用 update() 刷新屏幕才能生效。
+     *
+     * @function clear
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
+     *
+     * @cfg {return:false,name:"清屏"}
      * @example
      * // 清屏
      * oled.clear();
      */
     clear: function () {
-        return jm.s({ "_fn": oleddefId, op: 2 });
+        return jm.s({ "_fn": od, "op": 3 });
     },
 
     /**
-     * 在指定位置显示单个字符。
+     * 填充整个 OLED 屏幕。
      *
-     * @param {number} line - 行位置，范围：1~4
-     * @param {number} col - 列位置，范围：1~16
-     * @param {string} ch - 要显示的字符（ASCII可见字符）
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * 该方法用指定颜色填充整个屏幕，填充后会自动刷新。
      *
-     * @cfg {return:false,name:"显示字符", ch:'A', line:"行", col:"列", chType:"text"}
+     * @function fill
+     * @param {number} v - 填充颜色
+     *   - 0: 黑色（全部熄灭）
+     *   - 1: 白色（全部点亮）
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
+     * @cfg {return:false,name:"填充屏幕",vType:"bool",vOptions:"黑色=0,白色=1"}
      * @example
-     * // 在第1行第1列显示字符 'A'
-     * oled.showChar(1, 1, 'A');
+     * // 填充白屏
+     * oled.fill(1);
+     *
+     * // 填充黑屏
+     * oled.fill(0);
      */
-    showChar: function (line, col, ch) {
-        return jm.s({ "_fn": oleddefId, op: 3, l: line, c: col, ch: ch.charCodeAt(0) });
+    fill: function (v) {
+        return jm.s({ "_fn": od, "op": 4, "v": v });
     },
 
     /**
-     * 在指定位置显示字符串。
+     * 刷新 OLED 显示缓冲区到屏幕。
      *
-     * @param {number} line - 起始行位置，范围：1~4
-     * @param {number} col - 起始列位置，范围：1~16
-     * @param {string} s - 要显示的字符串（ASCII可见字符）
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * 该方法将内部 RAM 中的缓冲区内容刷到 LCD 屏幕上显示。
+     * 当使用 clear、fill、drawPixel 等不自动刷新的方法后，
+     * 必须调用本方法才能看到效果。
      *
-     * @cfg {return:false,name:"显示字符串", s:'字符串内容', line:"行", col:"列", sType:"text"}
+     * @function update
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
+     * @cfg {return:false,name:"刷新屏幕"}
      * @example
-     * // 在第1行第1列显示字符串 "Hello"
-     * oled.showString(1, 1, "Hello");
+     * // 画点后刷新
+     * oled.drawPixel(64, 32, 1);
+     * oled.update();
      */
-    showString: function (line, col, s) {
-        return jm.s({ "_fn": oleddefId, op: 4, l: line, c: col, s: s });
+    update: function () {
+        return jm.s({ "_fn": od, "op": 5 });
     },
 
     /**
-     * 在指定位置显示十进制无符号数字。
+     * 设置 OLED 显示是否反色。
      *
-     * @param {number} line - 起始行位置，范围：1~4
-     * @param {number} col - 起始列位置，范围：1~16
-     * @param {number} n - 要显示的数字，范围：0~4294967295
-     * @param {number} len - 要显示数字的长度，范围：1~10
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * @function invertDisplay
+     * @param {number} i - 是否反色
+     *   - 0: 正常显示
+     *   - 1: 反色显示
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
-     * @cfg {return:false,name:"显示无符号数", n:"无符号数字", len:"显示长度", line:"行", col:"列"}
-     *
+     * @cfg {return:false,name:"反色显示",iType:"bool",iOptions:"正常=0,反色=1"}
      * @example
-     * // 在第1行第1列显示数字 12345，长度为5
-     * oled.showNum(1, 1, 12345, 5);
+     * // 开启反色显示
+     * oled.invertDisplay(1);
+     *
+     * // 恢复正常显示
+     * oled.invertDisplay(0);
      */
-    showNum: function (line, col, n, len) {
-        return jm.s({ "_fn": oleddefId, op: 5, l: line, c: col, n: n, len: len });
+    invertDisplay: function (i) {
+        return jm.s({ "_fn": od, "op": 6, "i": i });
     },
 
     /**
-     * 在指定位置显示十进制有符号数字。
+     * 切换 OLED 显示反色状态。
      *
-     * @param {number} line - 起始行位置，范围：1~4
-     * @param {number} col - 起始列位置，范围：1~16
-     * @param {number} n - 要显示的数字，范围：-2147483648~2147483647
-     * @param {number} len - 要显示数字的长度，范围：1~10
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * 该方法切换当前的反色/正常显示模式。
      *
-     * @cfg {return:false,name:"显示有符号数" ,n:"有符号数字", len:"显示长度", line:"行", col:"列"}
+     * @function toggleInvert
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
+     * @cfg {return:false,name:"切换反色"}
      * @example
-     * // 在第1行第1列显示有符号数字 -123，长度为4
-     * oled.showSignedNum(1, 1, -123, 4);
-     */
-    showSignedNum: function (line, col, n, len) {
-        return jm.s({ "_fn": oleddefId, op: 6, l: line, c: col, n: n, len: len });
-    },
-
-    /**
-     * 在指定位置显示十六进制数字。
-     *
-     * @param {number} line - 起始行位置，范围：1~4
-     * @param {number} col - 起始列位置，范围：1~16
-     * @param {number} n - 要显示的数字，范围：0~0xFFFFFFFF
-     * @param {number} len - 要显示数字的长度，范围：1~8
-     * @returns {Object} 返回操作结果对象，code为0表示成功
-     *
-     * @cfg {return:false,name:"显示十六进制数", n:"十六进制数", len:"显示长度", line:"行", col:"列"}
-     *
-     * @example
-     * // 在第1行第1列显示十六进制数 0xFF，长度为2
-     * oled.showHexNum(1, 1, 0xFF, 2);
-     */
-    showHexNum: function (line, col, n, len) {
-        return jm.s({ "_fn": oleddefId, op: 7, l: line, c: col, n: n, len: len });
-    },
-
-    /**
-     * 在指定位置显示二进制数字。
-     *
-     * @param {number} line - 起始行位置，范围：1~4
-     * @param {number} col - 起始列位置，范围：1~16
-     * @param {number} n - 要显示的数字，范围：0~1111111111111111
-     * @param {number} len - 要显示数字的长度，范围：1~16
-     * @returns {Object} 返回操作结果对象，code为0表示成功
-     *
-     * @cfg {return:false,name:"显示二进制数", n:"二进制数", len:"显示长度", line:"行", col:"列"}
-     *
-     * @example
-     * // 在第1行第1列显示二进制数 10101010，长度为8
-     * oled.showBinNum(1, 1, 0b10101010, 8);
-     */
-    showBinNum: function (line, col, n, len) {
-        return jm.s({ "_fn": oleddefId, op: 8, l: line, c: col, n: n, len: len });
-    },
-
-    /**
-     * 刷新屏幕，将缓冲区内容更新到OLED面板。
-     * 通常在修改显存后调用以显示最新内容。
-     *
-     * @returns {Object} 返回操作结果对象，code为0表示成功
-     *
-     * @cfg {return:false,name:"刷新屏幕" }
-     *
-     * @example
-     * // 刷新屏幕
-     * oled.updateScreen();
-     */
-    updateScreen: function () {
-        return jm.s({ "_fn": oleddefId, op: 9 });
-    },
-
-    /**
-     * 切换屏幕反显状态。
-     * 在正常显示和反色显示之间切换。
-     *
-     * @returns {Object} 返回操作结果对象，code为0表示成功
-     *
-     * @cfg {return:false,name:"反显切换" }
-     *
-     * @example
-     * // 切换反显
+     * // 切换反色模式
      * oled.toggleInvert();
      */
     toggleInvert: function () {
-        return jm.s({ "_fn": oleddefId, op: 10 });
+        return jm.s({ "_fn": od, "op": 7 });
     },
 
     /**
-     * 填充整个屏幕为指定颜色。
+     * 在指定坐标画一个点。
      *
-     * @param {number} color - 填充颜色，0=黑色，1=白色
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * @function drawPixel
+     * @param {number} x - X 坐标（0 到 SSD1306_WIDTH-1）
+     * @param {number} y - Y 坐标（0 到 SSD1306_HEIGHT-1）
+     * @param {number} color - 点的颜色
+     *   - 0: 黑色
+     *   - 1: 白色
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
-     * @cfg {return:false,name:"填充屏幕", color:"填充颜色"}
-     *
+     * @cfg {return:false,name:"画点",x:"横坐标",y:"纵坐标",color:"颜色",colorOptions:"黑色=0,白色=1"}
      * @example
-     * // 填充白色
-     * oled.fill(1);
-     */
-    fill: function (color) {
-        return jm.s({ "_fn": oleddefId, op: 11, color: color });
-    },
-
-    /**
-     * 在指定坐标绘制单个像素点。
-     *
-     * @param {number} x - X坐标，范围：0~127
-     * @param {number} y - Y坐标，范围：0~63
-     * @param {number} color - 像素颜色，0=黑色，1=白色
-     * @returns {Object} 返回操作结果对象，code为0表示成功
-     *
-     * @cfg {return:false,name:"绘制像素", x:"X坐标", y:"Y坐标", color:"像素颜色"}
-     *
-     * @example
-     * // 在(10,10)绘制白色像素
-     * oled.drawPixel(10, 10, 1);
+     * // 在 (64, 32) 画一个白点
+     * oled.drawPixel(64, 32, 1);
+     * oled.update();
      */
     drawPixel: function (x, y, color) {
-        return jm.s({ "_fn": oleddefId, op: 12, x: x, y: y, color: color });
+        return jm.s({ "_fn": od, "op": 8, "x": x, "y": y, "color": color });
     },
 
     /**
-     * 设置光标位置，用于后续字符绘制。
+     * 绘制一条直线。
      *
-     * @param {number} x - X坐标，范围：0~127
-     * @param {number} y - Y坐标，范围：0~63
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * @function drawLine
+     * @param {number} x0 - 起始点 X 坐标
+     * @param {number} y0 - 起始点 Y 坐标
+     * @param {number} x1 - 结束点 X 坐标
+     * @param {number} y1 - 结束点 Y 坐标
+     * @param {number} color - 线的颜色
+     *   - 0: 黑色
+     *   - 1: 白色
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
-     * @cfg {return:false,name:"设置光标", x:"X坐标", y:"Y坐标"}
-     *
+     * @cfg {return:false,name:"画线",x0:"起始横坐标",y0:"起始纵坐标",x1:"结束横坐标",y1:"结束纵坐标",color:"颜色",colorOptions:"黑色=0,白色=1"}
      * @example
-     * // 设置光标到(10,10)
-     * oled.gotoXY(10, 10);
-     */
-    gotoXY: function (x, y) {
-        return jm.s({ "_fn": oleddefId, op: 13, x: x, y: y });
-    },
-
-    /**
-     * 在指定位置绘制单个字符（使用指定字体）。
-     *
-     * @param {number} x - X坐标，范围：0~127
-     * @param {number} y - Y坐标，范围：0~63
-     * @param {string} ch - 要显示的字符
-     * @param {number} font - 字体编号，0=7x10，1=11x18，2=16x26
-     * @param {number} color - 字符颜色，0=黑色，1=白色
-     * @returns {Object} 返回操作结果对象，code为0表示成功
-     *
-     * @cfg {return:false,name:"绘制字符", ch:'A', x:"X坐标", y:"Y坐标", font:"字体编号", color:"字符颜色", chType:"text"}
-     *
-     * @example
-     * // 在(10,10)用7x10字体显示字符'A'，白色
-     * oled.putc(10, 10, 'A', 0, 1);
-     */
-    putc: function (x, y, ch, font, color) {
-        return jm.s({ "_fn": oleddefId, op: 14, x: x, y: y, ch: ch.charCodeAt(0), font: font, color: color });
-    },
-
-    /**
-     * 在两点之间绘制直线。
-     *
-     * @param {number} x0 - 起点X坐标，范围：0~127
-     * @param {number} y0 - 起点Y坐标，范围：0~63
-     * @param {number} x1 - 终点X坐标，范围：0~127
-     * @param {number} y1 - 终点Y坐标，范围：0~63
-     * @param {number} color - 线条颜色，0=黑色，1=白色
-     * @returns {Object} 返回操作结果对象，code为0表示成功
-     *
-     * @cfg {return:false,name:"绘制直线", x0:"起点X", y0:"起点Y", x1:"终点X", y1:"终点Y", color:"线条颜色"}
-     *
-     * @example
-     * // 从(0,0)到(127,63)画白线
+     * // 从 (0, 0) 到 (127, 63) 画一条对角线
      * oled.drawLine(0, 0, 127, 63, 1);
+     * oled.update();
      */
     drawLine: function (x0, y0, x1, y1, color) {
-        return jm.s({ "_fn": oleddefId, op: 15, x0: x0, y0: y0, x1: x1, y1: y1, color: color });
+        return jm.s({ "_fn": od, "op": 9, "x0": x0, "y0": y0, "x1": x1, "y1": y1, "color": color });
     },
 
     /**
-     * 在指定位置绘制空心矩形。
+     * 绘制一个矩形（空心）。
      *
-     * @param {number} x - 左上角X坐标，范围：0~127
-     * @param {number} y - 左上角Y坐标，范围：0~63
-     * @param {number} w - 矩形宽度，范围：1~128
-     * @param {number} h - 矩形高度，范围：1~64
-     * @param {number} color - 矩形颜色，0=黑色，1=白色
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * @function drawRectangle
+     * @param {number} x - 左上角 X 坐标
+     * @param {number} y - 左上角 Y 坐标
+     * @param {number} w - 矩形宽度（像素）
+     * @param {number} h - 矩形高度（像素）
+     * @param {number} color - 线的颜色
+     *   - 0: 黑色
+     *   - 1: 白色
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
-     * @cfg {return:false,name:"绘制矩形", x:"左上角X", y:"左上角Y", w:"矩形宽度", h:"矩形高度", color:"矩形颜色"}
-     *
+     * @cfg {return:false,name:"画矩形",x:"横坐标",y:"纵坐标",w:"宽度",h:"高度",color:"颜色",colorOptions:"黑色=0,白色=1"}
      * @example
-     * // 在(10,10)绘制10x10白色空心矩形
-     * oled.drawRectangle(10, 10, 10, 10, 1);
+     * // 在 (10, 10) 处画一个 50x30 的空心矩形
+     * oled.drawRectangle(10, 10, 50, 30, 1);
+     * oled.update();
      */
     drawRectangle: function (x, y, w, h, color) {
-        return jm.s({ "_fn": oleddefId, op: 16, x: x, y: y, w: w, h: h, color: color });
+        return jm.s({ "_fn": od, "op": 10, "x": x, "y": y, "w": w, "h": h, "color": color });
     },
 
     /**
-     * 在指定位置绘制实心矩形。
+     * 绘制一个填充矩形。
      *
-     * @param {number} x - 左上角X坐标，范围：0~127
-     * @param {number} y - 左上角Y坐标，范围：0~63
-     * @param {number} w - 矩形宽度，范围：1~128
-     * @param {number} h - 矩形高度，范围：1~64
-     * @param {number} color - 矩形颜色，0=黑色，1=白色
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * @function drawFilledRectangle
+     * @param {number} x - 左上角 X 坐标
+     * @param {number} y - 左上角 Y 坐标
+     * @param {number} w - 矩形宽度（像素）
+     * @param {number} h - 矩形高度（像素）
+     * @param {number} color - 填充颜色
+     *   - 0: 黑色
+     *   - 1: 白色
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
-     * @cfg {return:false,name:"填充矩形", x:"左上角X", y:"左上角Y", w:"矩形宽度", h:"矩形高度", color:"填充颜色"}
-     *
+     * @cfg {return:false,name:"画填充矩形",x:"横坐标",y:"纵坐标",w:"宽度",h:"高度",color:"颜色",colorOptions:"黑色=0,白色=1"}
      * @example
-     * // 在(10,10)绘制10x10白色实心矩形
-     * oled.drawFilledRectangle(10, 10, 10, 10, 1);
+     * // 在 (10, 10) 处画一个 50x30 的填充矩形
+     * oled.drawFilledRectangle(10, 10, 50, 30, 1);
+     * oled.update();
      */
     drawFilledRectangle: function (x, y, w, h, color) {
-        return jm.s({ "_fn": oleddefId, op: 17, x: x, y: y, w: w, h: h, color: color });
+        return jm.s({ "_fn": od, "op": 11, "x": x, "y": y, "w": w, "h": h, "color": color });
     },
 
     /**
-     * 绘制三角形（三条边均为空心线条）。
+     * 绘制一个三角形（空心）。
      *
-     * @param {number} x1 - 顶点1 X坐标
-     * @param {number} y1 - 顶点1 Y坐标
-     * @param {number} x2 - 顶点2 X坐标
-     * @param {number} y2 - 顶点2 Y坐标
-     * @param {number} x3 - 顶点3 X坐标
-     * @param {number} y3 - 顶点3 Y坐标
-     * @param {number} color - 线条颜色，0=黑色，1=白色
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * @function drawTriangle
+     * @param {number} x1 - 第一个顶点 X 坐标
+     * @param {number} y1 - 第一个顶点 Y 坐标
+     * @param {number} x2 - 第二个顶点 X 坐标
+     * @param {number} y2 - 第二个顶点 Y 坐标
+     * @param {number} x3 - 第三个顶点 X 坐标
+     * @param {number} y3 - 第三个顶点 Y 坐标
+     * @param {number} color - 线的颜色
+     *   - 0: 黑色
+     *   - 1: 白色
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
-     * @cfg {return:false,name:"绘制三角形", x1:"顶点1 X", y1:"顶点1 Y", x2:"顶点2 X", y2:"顶点2 Y", x3:"顶点3 X", y3:"顶点3 Y", color:"线条颜色"}
-     *
+     * @cfg {return:false,name:"画三角形",x1:"第一点横坐标",y1:"第一点纵坐标",x2:"第二点横坐标",y2:"第二点纵坐标",x3:"第三点横坐标",y3:"第三点纵坐标",color:"颜色",colorOptions:"黑色=0,白色=1"}
      * @example
-     * // 绘制空心三角形
-     * oled.drawTriangle(0, 0, 20, 20, 40, 0, 1);
+     * // 绘制一个三角形
+     * oled.drawTriangle(10, 10, 60, 30, 30, 60, 1);
+     * oled.update();
      */
     drawTriangle: function (x1, y1, x2, y2, x3, y3, color) {
-        return jm.s({ "_fn": oleddefId, op: 18, x1: x1, y1: y1, x2: x2, y2: y2, x3: x3, y3: y3, color: color });
+        return jm.s({ "_fn": od, "op": 12, "x1": x1, "y1": y1, "x2": x2, "y2": y2, "x3": x3, "y3": y3, "color": color });
     },
 
     /**
-     * 绘制实心三角形。
+     * 绘制一个填充三角形。
      *
-     * @param {number} x1 - 顶点1 X坐标
-     * @param {number} y1 - 顶点1 Y坐标
-     * @param {number} x2 - 顶点2 X坐标
-     * @param {number} y2 - 顶点2 Y坐标
-     * @param {number} x3 - 顶点3 X坐标
-     * @param {number} y3 - 顶点3 Y坐标
-     * @param {number} color - 填充颜色，0=黑色，1=白色
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * @function drawFilledTriangle
+     * @param {number} x1 - 第一个顶点 X 坐标
+     * @param {number} y1 - 第一个顶点 Y 坐标
+     * @param {number} x2 - 第二个顶点 X 坐标
+     * @param {number} y2 - 第二个顶点 Y 坐标
+     * @param {number} x3 - 第三个顶点 X 坐标
+     * @param {number} y3 - 第三个顶点 Y 坐标
+     * @param {number} color - 填充颜色
+     *   - 0: 黑色
+     *   - 1: 白色
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
-     * @cfg {return:false,name:"填充三角形", x1:"顶点1 X", y1:"顶点1 Y", x2:"顶点2 X", y2:"顶点2 Y", x3:"顶点3 X", y3:"顶点3 Y", color:"填充颜色"}
-     *
+     * @cfg {return:false,name:"画填充三角形",x1:"第一点横坐标",y1:"第一点纵坐标",x2:"第二点横坐标",y2:"第二点纵坐标",x3:"第三点横坐标",y3:"第三点纵坐标",color:"颜色",colorOptions:"黑色=0,白色=1"}
      * @example
-     * // 绘制实心三角形
-     * oled.drawFilledTriangle(0, 0, 20, 20, 40, 0, 1);
+     * // 绘制一个填充三角形
+     * oled.drawFilledTriangle(10, 10, 60, 30, 30, 60, 1);
+     * oled.update();
      */
     drawFilledTriangle: function (x1, y1, x2, y2, x3, y3, color) {
-        return jm.s({ "_fn": oleddefId, op: 19, x1: x1, y1: y1, x2: x2, y2: y2, x3: x3, y3: y3, color: color });
+        return jm.s({ "_fn": od, "op": 13, "x1": x1, "y1": y1, "x2": x2, "y2": y2, "x3": x3, "y3": y3, "color": color });
     },
 
     /**
-     * 绘制圆形（空心）。
+     * 绘制一个圆形（空心）。
      *
-     * @param {number} x - 圆心X坐标，范围：0~127
-     * @param {number} y - 圆心Y坐标，范围：0~63
-     * @param {number} r - 半径，范围：0~63
-     * @param {number} color - 线条颜色，0=黑色，1=白色
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * @function drawCircle
+     * @param {number} x - 圆心 X 坐标
+     * @param {number} y - 圆心 Y 坐标
+     * @param {number} r - 圆半径（像素）
+     * @param {number} color - 线的颜色
+     *   - 0: 黑色
+     *   - 1: 白色
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
-     * @cfg {return:false,name:"绘制圆形", x:"圆心X", y:"圆心Y", r:"半径", color:"线条颜色"}
-     *
+     * @cfg {return:false,name:"画圆",x:"圆心横坐标",y:"圆心纵坐标",r:"半径",color:"颜色",colorOptions:"黑色=0,白色=1"}
      * @example
-     * // 在屏幕中心绘制半径10的白色空心圆
-     * oled.drawCircle(64, 32, 10, 1);
+     * // 在 (64, 32) 处画一个半径为 20 的圆
+     * oled.drawCircle(64, 32, 20, 1);
+     * oled.update();
      */
     drawCircle: function (x, y, r, color) {
-        return jm.s({ "_fn": oleddefId, op: 20, x: x, y: y, r: r, color: color });
+        return jm.s({ "_fn": od, "op": 14, "x": x, "y": y, "r": r, "color": color });
     },
 
     /**
-     * 绘制实心圆形。
+     * 绘制一个填充圆。
      *
-     * @param {number} x - 圆心X坐标，范围：0~127
-     * @param {number} y - 圆心Y坐标，范围：0~63
-     * @param {number} r - 半径，范围：0~63
-     * @param {number} color - 填充颜色，0=黑色，1=白色
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * @function drawFilledCircle
+     * @param {number} x - 圆心 X 坐标
+     * @param {number} y - 圆心 Y 坐标
+     * @param {number} r - 圆半径（像素）
+     * @param {number} color - 填充颜色
+     *   - 0: 黑色
+     *   - 1: 白色
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
-     * @cfg {return:false,name:"填充圆形", x:"圆心X", y:"圆心Y", r:"半径", color:"填充颜色"}
-     *
+     * @cfg {return:false,name:"画填充圆",x:"圆心横坐标",y:"圆心纵坐标",r:"半径",color:"颜色",colorOptions:"黑色=0,白色=1"}
      * @example
-     * // 在屏幕中心绘制半径10的白色实心圆
-     * oled.drawFilledCircle(64, 32, 10, 1);
+     * // 在 (64, 32) 处画一个半径为 20 的填充圆
+     * oled.drawFilledCircle(64, 32, 20, 1);
+     * oled.update();
      */
     drawFilledCircle: function (x, y, r, color) {
-        return jm.s({ "_fn": oleddefId, op: 21, x: x, y: y, r: r, color: color });
+        return jm.s({ "_fn": od, "op": 15, "x": x, "y": y, "r": r, "color": color });
     },
 
     /**
-     * 在指定位置绘制位图。
+     * 启动屏幕向右滚动效果。
      *
-     * @param {number} x - 左上角X坐标，范围：0~127
-     * @param {number} y - 左上角Y坐标，范围：0~63
-     * @param {number} w - 位图宽度（像素），范围：1~128
-     * @param {number} h - 位图高度（像素），范围：1~64
-     * @param {number} color - 位图颜色，0=黑色，1=白色
-     * @param {string} s - 位图数据的十六进制字符串
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * @function scrollRight
+     * @param {number} start_row - 起始行（0-7）
+     * @param {number} end_row - 结束行（0-7）
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
-     * @cfg {return:false,name:"绘制位图", x:"左上角X", y:"左上角Y", w:"位图宽度", h:"位图高度", color:"位图颜色", s:'hex字符串', sType:"text"}
-     *
+     * @cfg {return:false,name:"向右滚动",start_row:"起始行",end_row:"结束行"}
      * @example
-     * // 在(0,0)绘制64x64白色位图
-     * oled.drawBitmap(0, 0, 64, 64, 1, '00FF...');
-     */
-    drawBitmap: function (x, y, w, h, color, s) {
-        return jm.s({ "_fn": oleddefId, op: 22, x: x, y: y, w: w, h: h, color: color, s: s });
-    },
-
-    /**
-     * 向右水平滚动屏幕。
-     *
-     * @param {number} start - 起始页（行），范围：0~7
-     * @param {number} end - 结束页（行），范围：0~7
-     * @returns {Object} 返回操作结果对象，code为0表示成功
-     *
-     * @cfg {return:false,name:"向右滚动", start:"起始页", end:"结束页"}
-     *
-     * @example
-     * // 第0页到第7页向右滚动
+     * // 从第 0 行到第 7 行向右滚动
      * oled.scrollRight(0, 7);
      */
-    scrollRight: function (start, end) {
-        return jm.s({ "_fn": oleddefId, op: 23, start: start, end: end });
+    scrollRight: function (start_row, end_row) {
+        return jm.s({ "_fn": od, "op": 16, "start_row": start_row, "end_row": end_row });
     },
 
     /**
-     * 向左水平滚动屏幕。
+     * 启动屏幕向左滚动效果。
      *
-     * @param {number} start - 起始页（行），范围：0~7
-     * @param {number} end - 结束页（行），范围：0~7
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * @function scrollLeft
+     * @param {number} start_row - 起始行（0-7）
+     * @param {number} end_row - 结束行（0-7）
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
-     * @cfg {return:false,name:"向左滚动", start:"起始页", end:"结束页"}
-     *
+     * @cfg {return:false,name:"向左滚动",start_row:"起始行",end_row:"结束行"}
      * @example
-     * // 第0页到第7页向左滚动
+     * // 从第 0 行到第 7 行向左滚动
      * oled.scrollLeft(0, 7);
      */
-    scrollLeft: function (start, end) {
-        return jm.s({ "_fn": oleddefId, op: 24, start: start, end: end });
+    scrollLeft: function (start_row, end_row) {
+        return jm.s({ "_fn": od, "op": 17, "start_row": start_row, "end_row": end_row });
     },
 
     /**
-     * 向右上对角线滚动屏幕。
+     * 启动屏幕对角向右滚动效果。
      *
-     * @param {number} start - 起始页（行），范围：0~7
-     * @param {number} end - 结束页（行），范围：0~7
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * @function scrollDiagRight
+     * @param {number} start_row - 起始行（0-7）
+     * @param {number} end_row - 结束行（0-7）
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
-     * @cfg {return:false,name:"斜向右上滚动", start:"起始页", end:"结束页"}
-     *
+     * @cfg {return:false,name:"对角右滚",start_row:"起始行",end_row:"结束行"}
      * @example
-     * // 第0页到第7页斜向右上滚动
-     * oled.scrolldiagright(0, 7);
+     * // 对角向右滚动
+     * oled.scrollDiagRight(0, 7);
      */
-    scrolldiagright: function (start, end) {
-        return jm.s({ "_fn": oleddefId, op: 25, start: start, end: end });
+    scrollDiagRight: function (start_row, end_row) {
+        return jm.s({ "_fn": od, "op": 18, "start_row": start_row, "end_row": end_row });
     },
 
     /**
-     * 向左上对角线滚动屏幕。
+     * 启动屏幕对角向左滚动效果。
      *
-     * @param {number} start - 起始页（行），范围：0~7
-     * @param {number} end - 结束页（行），范围：0~7
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * @function scrollDiagLeft
+     * @param {number} start_row - 起始行（0-7）
+     * @param {number} end_row - 结束行（0-7）
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
-     * @cfg {return:false,name:"斜向左上滚动", start:"起始页", end:"结束页"}
-     *
+     * @cfg {return:false,name:"对角左滚",start_row:"起始行",end_row:"结束行"}
      * @example
-     * // 第0页到第7页斜向左上滚动
-     * oled.scrolldiagleft(0, 7);
+     * // 对角向左滚动
+     * oled.scrollDiagLeft(0, 7);
      */
-    scrolldiagleft: function (start, end) {
-        return jm.s({ "_fn": oleddefId, op: 26, start: start, end: end });
+    scrollDiagLeft: function (start_row, end_row) {
+        return jm.s({ "_fn": od, "op": 19, "start_row": start_row, "end_row": end_row });
     },
 
     /**
-     * 停止当前屏幕滚动。
+     * 停止屏幕滚动效果。
      *
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * 该方法停止当前正在进行的滚动动画。
      *
-     * @cfg {return:false,name:"停止滚动" }
+     * @function stopScroll
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
+     * @cfg {return:false,name:"停止滚动"}
      * @example
      * // 停止滚动
-     * oled.stopscroll();
+     * oled.stopScroll();
      */
-    stopscroll: function () {
-        return jm.s({ "_fn": oleddefId, op: 27 });
+    stopScroll: function () {
+        return jm.s({ "_fn": od, "op": 20 });
     },
 
     /**
-     * 切换屏幕反显模式。
+     * 开启或关闭 OLED 电源。
      *
-     * @param {boolean} i - 反显开关，true=反色显示，false=正常显示
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * @function setPower
+     * @param {number} v - 电源状态
+     *   - 1: 开启显示
+     *   - 0: 关闭显示
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
-     * @cfg {return:false,name:"反显模式", i:"反显开关", iType:"bool"}
-     *
+     * @cfg {return:false,name:"电源控制",vType:"bool",vOptions:"关闭=0,开启=1"}
      * @example
-     * // 开启反显
-     * oled.invertDisplay(true);
+     * // 开启 OLED 显示
+     * oled.setPower(1);
+     *
+     * // 关闭 OLED 显示
+     * oled.setPower(0);
      */
-    invertDisplay: function (i) {
-        return jm.s({ "_fn": oleddefId, op: 28, i: i });
+    setPower: function (v) {
+        return jm.s({ "_fn": od, "op": 21, "v": v });
     },
 
     /**
-     * 打开OLED显示（唤醒）。
+     * 开启 OLED 显示。
      *
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * 该方法等同于 setPower(1)。
      *
-     * @cfg {return:false,name:"打开显示" }
+     * @function on
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
+     * @cfg {return:false,name:"开启显示"}
      * @example
-     * // 打开OLED
      * oled.on();
      */
     on: function () {
-        return jm.s({ "_fn": oleddefId, op: 29 });
+        return jm.s({ "_fn": od, "op": 21, "v": 1 });
     },
 
     /**
-     * 关闭OLED显示（休眠）。
+     * 关闭 OLED 显示。
      *
-     * @returns {Object} 返回操作结果对象，code为0表示成功
+     * 该方法等同于 setPower(0)。
      *
-     * @cfg {return:false,name:"关闭显示" }
+     * @function off
+     * @returns {OLEDDisplayResult} 返回操作结果对象，code为0表示成功
      *
+     * @cfg {return:false,name:"关闭显示"}
      * @example
-     * // 关闭OLED
      * oled.off();
      */
     off: function () {
-        return jm.s({ "_fn": oleddefId, op: 30 });
+        return jm.s({ "_fn": od, "op": 21, "v": 0 });
     }
 };
 
-//exports = oled;

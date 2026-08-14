@@ -30,7 +30,10 @@ import event from "./jmicro/jm_event.js"
 import dev from "./jmicro/jm_dev.js"
 import utils from "./jmicro/jm_utils.js"
 
-import oled from "./sensor/jm_oled1306.js"
+//STM32上的OLED API
+//import oled from "./jmicro/jm_oled.js"
+
+import display from "./sensor/jm_oled1306.js"
 import pca9685 from "./sensor/jm_pca9685.js"
 import bleMouse from "./sensor/jm_blemouse.js"
 import bleKeyboard from "./sensor/jm_blekeyboard.js"
@@ -66,7 +69,7 @@ const jmModule = {
     ah20,
     dht11,
     irdis,
-    oled,
+    display,
     sensor,
     servo,
     Stepper,
@@ -97,7 +100,8 @@ const jmModule = {
     bleMouse,
     bleKeyboard,
     bleGamepad,
-    mqttProxy
+    mqttProxy,
+    //oled
 }
 
 Object.assign(jm, jmModule);

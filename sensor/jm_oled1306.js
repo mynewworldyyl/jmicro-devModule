@@ -1207,4 +1207,4 @@ var display = {
 
 };
 
-//exports = oled
+//exports = display

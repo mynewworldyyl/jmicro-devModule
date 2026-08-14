@@ -1,38 +1,55 @@
 const path = require('path');
+const fs = require('fs');
 const TerserPlugin = require('terser-webpack-plugin');
+
+const actId = (process.env.ACT_ID || process.env.npm_config_actId || '').toString().trim();
+const baseDir = __dirname;
+const buildSrcDir = actId
+    ? path.join(baseDir, 'userModules', actId, 'build_src')
+    : path.join(baseDir, 'build_src');
 
 module.exports = (env, argv) => {
   const isProduction = argv.mode === 'production';
+  const isUserBuild = !!actId;
+  const entryName = isUserBuild ? `jmicro.h5.${actId}` : 'jmicro.h5';
+  
+  if (!entryName) {
+    throw new Error('Webpack entry name is empty. Check ACT_ID configuration.');
+  }
+  
+  const entryPath = path.join(buildSrcDir, 'index.js');
+  if (!fs.existsSync(entryPath)) {
+    throw new Error(`Webpack entry file not found: ${entryPath}`);
+  }
+  
+  const entry = {};
+  entry[entryName] = entryPath;
   
   return {
     // 入口文件
-    entry: {
-      'jmicro.h5': './build_src/index.js',
-      // 如果需要单独导出精简版，可以取消注释
-      // 'jmicro-srvitem.min': './build_src/index.js'
-    },
+    entry,
     
     // 输出配置
     output: {
-      path: path.resolve(__dirname, 'dist'),
+      path: isUserBuild
+        ? path.resolve(baseDir, 'userModules', actId)
+        : path.resolve(__dirname, 'dist'),
       filename: isProduction ? '[name].min.js' : '[name].js',
-      // 输出为 UMD 格式，兼容多种模块系统
       library: {
-        name: 'JMicroSrvItem',  // 全局变量名
+        name: 'JMicroSrvItem',
         type: 'umd',
         export: 'default',
         umdNamedDefine: true
       },
       globalObject: 'typeof self !== \'undefined\' ? self : this',
-      clean: true  // 打包前清空输出目录
+      clean: false
     },
     
     // 模块解析规则
     resolve: {
       extensions: ['.js', '.json'],
       alias: {
-        // 如果需要，可以设置别名
-        '@': path.resolve(__dirname, 'build_src')
+        '@': buildSrcDir
       }
     },
     

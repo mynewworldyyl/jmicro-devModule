@@ -9,6 +9,7 @@
     "prebuild": "node prebuild.js",
     "build": "npm run prebuild && webpack --mode production",
     "build:dev": "npm run prebuild && webpack --mode development",
+    "buildUserModule": "node build_user_module.js",
     "watch": "npm run prebuild && webpack --watch"
   },
   "keywords": [

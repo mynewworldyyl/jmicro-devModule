@@ -3,7 +3,7 @@ const path = require('path');
 
 const dirs = ['arduino', 'jmicro', 'sensor'];
 const baseDir = __dirname;
-const buildSrcDir = path.join(baseDir, 'build_src');
+const systemBuildSrcDir = path.join(baseDir, 'build_src');
 
 function emptyDir(dir) {
     if (!fs.existsSync(dir)) return;
@@ -91,57 +91,133 @@ function processAsyncMethods(content) {
     return result;
 }
 
-function prepareBuildSrc() {
-    if (fs.existsSync(buildSrcDir)) {
-        emptyDir(buildSrcDir);
+function hasRealExport(content, varName) {
+  const uncommented = content.replace(/^\s*\/\/.*$/gm, '');
+  return uncommented.trimEnd().endsWith(`module.exports = ${varName};`);
+}
+
+const actId = (process.env.ACT_ID || process.env.npm_config_actId || '').toString().trim();
+
+if (actId) {
+    // ========== 用户构建：只构建用户自己的模块 ==========
+    const userBuildSrcDir = path.join(baseDir, 'userModules', actId, 'build_src');
+
+    if (fs.existsSync(userBuildSrcDir)) {
+        emptyDir(userBuildSrcDir);
     }
-    fs.mkdirSync(buildSrcDir, { recursive: true });
+    fs.mkdirSync(userBuildSrcDir, { recursive: true });
+
+    let indexContent = `// User build entry for actId: ${actId}\n`;
+    const userImports = [];
+    const userAssignments = [];
+    const newUserModules = [];
+
+    const userDir = path.join(baseDir, 'userModules', actId);
+    if (fs.existsSync(userDir) && fs.lstatSync(userDir).isDirectory()) {
+        const userFiles = fs.readdirSync(userDir).filter(f => f.endsWith('.js') && !f.endsWith('.min.js'));
+
+        for (const file of userFiles) {
+            const fileName = file;
+            const modName = file.replace(/^jm_/, '').replace(/\.js$/, '');
+            let targetPath = null;
+            
+            for (const dir of dirs) {
+                const candidate = path.join(userBuildSrcDir, dir, fileName);
+                if (fs.existsSync(candidate)) {
+                    targetPath = candidate;
+                    break;
+                }
+            }
+            
+            if (targetPath) {
+                fs.copyFileSync(path.join(userDir, fileName), targetPath);
+                console.log(`[prebuild] user module override: ${path.relative(userBuildSrcDir, targetPath)}`);
+            } else {
+                const dstPath = path.join(userBuildSrcDir, fileName);
+                fs.copyFileSync(path.join(userDir, fileName), dstPath);
+                newUserModules.push({ fileName, modName, dstPath });
+                console.log(`[prebuild] user module added: ${fileName} -> ${modName}`);
+            }
+        }
+        
+        for (const mod of newUserModules) {
+            userImports.push(`import ${mod.modName} from "./${mod.fileName}"`);
+            userAssignments.push(`Object.assign(jm, {${mod.modName}: ${mod.modName}})`);
+            userAssignments.push(`Object.assign(window, {${mod.modName}: ${mod.modName}})`);
+
+            const filePath = mod.dstPath;
+            let content = fs.readFileSync(filePath, 'utf8');
+            const m = content.match(/^\s*var\s+(\w+)\s*=\s*\{/m);
+            const vName = m ? m[1] : mod.modName;
+
+            const asyncContent = processAsyncMethods(content);
+            if (asyncContent !== content) {
+                fs.writeFileSync(filePath, asyncContent, 'utf8');
+                console.log(`[prebuild] async transformed (user): ${mod.fileName}`);
+            }
+
+            const finalContent = fs.readFileSync(filePath, 'utf8');
+            if (!hasRealExport(finalContent, vName)) {
+                fs.appendFileSync(filePath, `\nmodule.exports = ${vName};\n`, 'utf8');
+                console.log(`[prebuild] injected export (user): ${mod.fileName} -> ${vName}`);
+            }
+        }
+
+        if (newUserModules.length > 0) {
+            indexContent += '\n// ========== 用户模块 ==========\n';
+            indexContent += userImports.join('\n') + '\n';
+            indexContent += userAssignments.join('\n') + '\n';
+        }
+    }
+
+    fs.writeFileSync(path.join(userBuildSrcDir, 'index.js'), indexContent);
+    console.log(`[prebuild] user build_src ready: ${userBuildSrcDir}`);
+
+} else {
+    // ========== 系统构建：构建全部系统模块 ==========
+    if (fs.existsSync(systemBuildSrcDir)) {
+        emptyDir(systemBuildSrcDir);
+    }
+    fs.mkdirSync(systemBuildSrcDir, { recursive: true });
 
     const rootIndex = path.join(baseDir, 'index.js');
     if (fs.existsSync(rootIndex)) {
-        fs.copyFileSync(rootIndex, path.join(buildSrcDir, 'index.js'));
+        fs.copyFileSync(rootIndex, path.join(systemBuildSrcDir, 'index.js'));
     }
 
     dirs.forEach(dir => {
         const srcDir = path.join(baseDir, dir);
-        const dstDir = path.join(buildSrcDir, dir);
+        const dstDir = path.join(systemBuildSrcDir, dir);
         if (!fs.existsSync(srcDir)) return;
         copyDir(srcDir, dstDir);
     });
-}
 
-prepareBuildSrc();
+    dirs.forEach(dir => {
+        const dirPath = path.join(systemBuildSrcDir, dir);
+        if (!fs.existsSync(dirPath)) return;
 
-dirs.forEach(dir => {
-  const dirPath = path.join(buildSrcDir, dir);
-  if (!fs.existsSync(dirPath)) return;
+        fs.readdirSync(dirPath).forEach(file => {
+            if (!file.endsWith('.js')) return;
+            const filePath = path.join(dirPath, file);
+            let content = fs.readFileSync(filePath, 'utf8');
 
-  fs.readdirSync(dirPath).forEach(file => {
-    if (!file.endsWith('.js')) return;
-    const filePath = path.join(dirPath, file);
-    let content = fs.readFileSync(filePath, 'utf8');
+            const m = content.match(/^\s*var\s+(\w+)\s*=\s*\{/m);
+            if (!m) return;
+            const varName = m[1];
 
-    const m = content.match(/^\s*var\s+(\w+)\s*=\s*\{/m);
-    if (!m) return;
-    const varName = m[1];
+            const asyncContent = processAsyncMethods(content);
+            if (asyncContent !== content) {
+                fs.writeFileSync(filePath, asyncContent, 'utf8');
+                console.log(`[prebuild] async transformed: build_src/${dir}/${file}`);
+            }
 
-    const asyncContent = processAsyncMethods(content);
-    if (asyncContent !== content) {
-        fs.writeFileSync(filePath, asyncContent, 'utf8');
-        console.log(`[prebuild] async transformed: build_src/${dir}/${file}`);
-    }
+            if (hasRealExport(content, varName)) return;
 
-    if (hasRealExport(content, varName)) return;
-
-    const finalContent = fs.readFileSync(filePath, 'utf8');
-    if (!hasRealExport(finalContent, varName)) {
-        fs.appendFileSync(filePath, `\nmodule.exports = ${varName};\n`, 'utf8');
-        console.log(`[prebuild] injected: build_src/${dir}/${file} -> ${varName}`);
-    }
-  });
-});
-
-function hasRealExport(content, varName) {
-  const uncommented = content.replace(/^\s*\/\/.*$/gm, '');
-  return uncommented.trimEnd().endsWith(`module.exports = ${varName};`);
+            const finalContent = fs.readFileSync(filePath, 'utf8');
+            if (!hasRealExport(finalContent, varName)) {
+                fs.appendFileSync(filePath, `\nmodule.exports = ${varName};\n`, 'utf8');
+                console.log(`[prebuild] injected: build_src/${dir}/${file} -> ${varName}`);
+            }
+        });
+    });
 }

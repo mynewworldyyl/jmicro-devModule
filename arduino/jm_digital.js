@@ -117,7 +117,8 @@ var gpio = {
      * @param {number} [targetDevId] - 目标设备ID，为空时操作当前设备
      * @param {boolean} [sync] - 是否同步请求，true表示同步等待结果，false表示异步执行，默认为false
      * @returns {GPIOResult} 返回操作结果对象，code为0表示成功
-     * 
+     *
+     * @cfg {return:false,name:"引脚模式", pin:"反显开关", mode:"模式"}
      * @example
      * // 设置引脚 13 为输出模式
      * gpio.pinMode(13, gpio.OUTPUT);
